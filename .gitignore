@@ -1,3 +1,6 @@
+Debug
+Drivers
+
 # Prerequisites
 *.d
 
@@ -50,3 +53,6 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+STM32F303RETX_FLASH.ld
+*.prefs
+*.xml
