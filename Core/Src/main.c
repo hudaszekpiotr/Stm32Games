@@ -44,10 +44,27 @@ I2C_HandleTypeDef hi2c1;
 
 SPI_HandleTypeDef hspi1;
 
+TIM_HandleTypeDef htim16;
+TIM_HandleTypeDef htim17;
+
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+bool menu_button_edge_falling = false;
+bool up_button_edge_falling = false;
+bool down_button_edge_falling = false;
+bool left_button_edge_falling = false;
+bool right_button_edge_falling = false;
+Vector2D player_input_dpad = {0, 0};
+Vector2D player_input_accelerometr = {0, 0};
 
+bool in_menu = true;
+bool new_game = true;
+MenuScreen menu_screen = Snake;
+GameName game_name = Snake;
+ControlMethod control_method = Dpad;
+int difficulty = 1;
+int screen_brightness = 1;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -56,32 +73,14 @@ static void MX_GPIO_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_TIM16_Init(void);
+static void MX_TIM17_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-typedef struct Vector2D {
-	float x;
-	float y;
-} Vector2D;
-
-struct ScreenPosition {
-	unsigned x;
-	unsigned y;
-};
-
-enum GameName {
-	Snake,
-	Labirynth,
-	Tetris
-};
-
-enum ControlMethod {
-	Dpad,
-	Accelerometer
-};
 
 void set_screens_register(uint8_t addr, uint8_t data){
 	HAL_GPIO_WritePin(GPIOA, CS_Pin, GPIO_PIN_RESET);
@@ -138,23 +137,223 @@ void draw_frame(uint16_t * array) {
 }
 
 void setup_accelerometr() {
-	;
+	uint8_t val_bw_rate = 0b00000000;//100Hz
+	uint8_t val_power_ctl = 0b00001000;//turn on
+	uint8_t val_data_format = 0b00000000;// +-2g
+
+	HAL_I2C_Mem_Write(&hi2c1, ADXL345_ADDR, REG_POWER_CTL, 1, &val_power_ctl, sizeof(val_power_ctl), HAL_MAX_DELAY);
+	HAL_I2C_Mem_Write(&hi2c1, ADXL345_ADDR, REG_DATA_FORMAT, 1, &val_data_format, sizeof(val_data_format), HAL_MAX_DELAY);
+	HAL_I2C_Mem_Write(&hi2c1, ADXL345_ADDR, REG_BW_RATE, 1, &val_bw_rate, sizeof(val_bw_rate), HAL_MAX_DELAY);
 }
 
 Vector2D get_accelerometr_input(){
-	//HAL_I2C_Mem_Write(&hi2c1, ADXL345_ADDR, reg, 1, &value, sizeof(value), HAL_MAX_DELAY);
-	//HAL_I2C_Mem_Read(&hi2c1, ADXL345_ADDR, reg, 1, &value, sizeof(value), HAL_MAX_DELAY);
-	;
+	int16_t x_val;
+	int16_t y_val;
+	HAL_I2C_Mem_Read(&hi2c1, ADXL345_ADDR, DATAX0 | 0x80, 1, (uint8_t*)&x_val, sizeof(x_val), HAL_MAX_DELAY);
+	HAL_I2C_Mem_Read(&hi2c1, ADXL345_ADDR, DATAY0 | 0x80, 1, (uint8_t*)&y_val, sizeof(y_val), HAL_MAX_DELAY);
 
+	Vector2D vector = {(float)x_val/0x7FFF, (float)y_val/0x7FFF};
+	return vector;
 }
 
-Vector2D get_d_pad_input(){
-;
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+	switch(GPIO_Pin){
+	case MENU_BUTTON_Pin:
+		menu_button_edge_falling = true;
+		break;
+	case UP_BUTTON_Pin:
+		up_button_edge_falling = true;
+		break;
+	case DOWN_BUTTON_Pin:
+		down_button_edge_falling = true;
+		break;
+	case LEFT_BUTTON_Pin:
+		left_button_edge_falling = true;
+		break;
+	case RIGHT_BUTTON_Pin:
+		right_button_edge_falling = true;
+		break;
+	}
 }
 
-int get_difficulty(){
-;
+bool debounce_button(GPIO_TypeDef *port, uint16_t pin, bool *edge_var, int* counter){
+	if(*edge_var){
+		if(HAL_GPIO_ReadPin(port, pin) == GPIO_PIN_SET){
+			*edge_var = false;
+			return false;
+		}
+		if(*counter > 5){
+			*counter = 0;
+			*edge_var = false;
+			return true;
+		}
+		(*counter)++;
+	}
+	return false;
 }
+
+void check_buttons(){
+	static int menu_button_stable_counter = 0;
+	static int up_button_stable_counter = 0;
+	static int down_button_stable_counter = 0;
+	static int left_button_stable_counter = 0;
+	static int right_button_stable_counter = 0;
+
+	if(debounce_button(GPIOB, MENU_BUTTON_Pin, &menu_button_edge_falling, &menu_button_stable_counter)){
+		in_menu = true;
+		switch(menu_screen){
+		case SnakeMenu:
+			draw_frame(get_snake_menu_screen());
+			break;
+		case Brightness:
+			draw_frame(get_brightness_menu_screen(screen_brightness));
+			break;
+		case Difficulty:
+			draw_frame(get_difficulty_menu_screen(difficulty));
+			break;
+		case ControlMethodMenu:
+			draw_frame(get_control_method_menu_screen(control_method));
+			break;
+		}
+	}
+	if(debounce_button(GPIOB, UP_BUTTON_Pin, &up_button_edge_falling, &up_button_stable_counter)){
+		player_input_dpad.x = 0;
+		player_input_dpad.y = 1;
+		if(in_menu){
+			switch(menu_screen){
+			case SnakeMenu:
+				in_menu = false;
+				game_name = Snake;
+				new_game = true;
+				player_input_dpad.x = 0;
+				player_input_dpad.y = 0;
+				break;
+			case Brightness:
+				if(screen_brightness < 16) screen_brightness++;
+				draw_frame(get_brightness_menu_screen(screen_brightness));
+				break;
+			case Difficulty:
+				if(difficulty < 16) difficulty++;
+				draw_frame(get_difficulty_menu_screen(difficulty));
+				break;
+			case ControlMethodMenu:
+				control_method = Dpad;
+				draw_frame(get_control_method_menu_screen(control_method));
+				break;
+			}
+		}
+	}
+	if(debounce_button(GPIOA, DOWN_BUTTON_Pin, &down_button_edge_falling, &down_button_stable_counter)){
+		player_input_dpad.x = 0;
+		player_input_dpad.y = -1;
+		if(in_menu){
+			switch(menu_screen){
+			case SnakeMenu:
+				in_menu = false;
+				game_name = Snake;
+				new_game = true;
+				player_input_dpad.x = 0;
+				player_input_dpad.y = 0;
+				break;
+			case Brightness:
+				if(screen_brightness > 1) screen_brightness--;
+				draw_frame(get_brightness_menu_screen(screen_brightness));
+				break;
+			case Difficulty:
+				if(difficulty > 1) difficulty--;
+				draw_frame(get_difficulty_menu_screen(difficulty));
+				break;
+			case ControlMethodMenu:
+				control_method = Accelerometer;
+				draw_frame(get_control_method_menu_screen(control_method));
+				break;
+			}
+		}
+	}
+	if(debounce_button(GPIOC, LEFT_BUTTON_Pin, &left_button_edge_falling, &left_button_stable_counter)){
+		player_input_dpad.x = -1;
+		player_input_dpad.y = 0;
+		if(in_menu){
+			switch(menu_screen){
+			case SnakeMenu:
+				menu_screen = Brightness;
+				draw_frame(get_brightness_menu_screen(screen_brightness));
+				break;
+			case ControlMethodMenu:
+				menu_screen = Snake;
+				draw_frame(get_snake_menu_screen());
+				break;
+			case Difficulty:
+				menu_screen = ControlMethodMenu;
+				draw_frame(get_control_method_menu_screen(control_method));
+				break;
+			case Brightness:
+				menu_screen = Difficulty;
+				draw_frame(get_difficulty_menu_screen(difficulty));
+				break;
+			}
+		}
+	}
+	if(debounce_button(GPIOA, RIGHT_BUTTON_Pin, &right_button_edge_falling, &right_button_stable_counter)){
+		player_input_dpad.x = 1;
+		player_input_dpad.y = 0;
+		if(in_menu){
+			switch(menu_screen){
+			case SnakeMenu:
+				menu_screen = ControlMethodMenu;
+				draw_frame(get_control_method_menu_screen(control_method));
+				break;
+			case ControlMethodMenu:
+				menu_screen = Difficulty;
+				draw_frame(get_difficulty_menu_screen(difficulty));
+				break;
+			case Difficulty:
+				menu_screen = Brightness;
+				draw_frame(get_brightness_menu_screen(screen_brightness));
+				break;
+			case Brightness:
+				menu_screen = Snake;
+				draw_frame(get_snake_menu_screen());
+				break;
+			}
+		}
+	}
+}
+
+void play_game_timer_it(){
+	Vector2D player_input;
+	if(control_method == Dpad){
+		player_input = player_input_dpad;
+	}else{
+		player_input = get_accelerometr_input();
+	}
+
+	uint16_t* frame;
+	switch(game_name){
+	case Snake:
+		frame = snake_get_frame(player_input, control_method, new_game);
+		new_game = false;
+		break;
+	case Tetris:
+		break;
+	}
+	draw_frame(frame);
+}
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  if (htim == &htim16 && !in_menu)
+  {
+	  play_game_timer_it();
+  }
+  if (htim == &htim17 ){
+	  check_buttons();
+  }
+}
+
+
 /* USER CODE END 0 */
 
 /**
@@ -188,10 +387,16 @@ int main(void)
   MX_USART2_UART_Init();
   MX_I2C1_Init();
   MX_SPI1_Init();
+  MX_TIM16_Init();
+  MX_TIM17_Init();
   /* USER CODE BEGIN 2 */
-  uint16_t arr[16] = {1,2,3,8,1000,512,1,1,
-		  1,1,1,1,1,1,1,1};
   setup_screen();
+  setup_accelerometr();
+  HAL_TIM_Base_Start_IT(&htim16);
+  HAL_TIM_Base_Start_IT(&htim17);
+  draw_frame(get_snake_menu_screen());
+
+
 
   /* USER CODE END 2 */
 
@@ -202,10 +407,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  //HAL_GPIO_TogglePin (GPIOA, GREEN_LED_Pin);
-
-	  draw_frame(arr);
-	  HAL_Delay (1000);   /* Insert delay 100 ms */
+	  HAL_Delay (1000);
   }
   /* USER CODE END 3 */
 }
@@ -248,9 +450,12 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_I2C1;
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_USART2|RCC_PERIPHCLK_I2C1
+                              |RCC_PERIPHCLK_TIM16|RCC_PERIPHCLK_TIM17;
   PeriphClkInit.Usart2ClockSelection = RCC_USART2CLKSOURCE_PCLK1;
   PeriphClkInit.I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI;
+  PeriphClkInit.Tim16ClockSelection = RCC_TIM16CLK_HCLK;
+  PeriphClkInit.Tim17ClockSelection = RCC_TIM17CLK_HCLK;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
   {
     Error_Handler();
@@ -346,6 +551,70 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief TIM16 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM16_Init(void)
+{
+
+  /* USER CODE BEGIN TIM16_Init 0 */
+
+  /* USER CODE END TIM16_Init 0 */
+
+  /* USER CODE BEGIN TIM16_Init 1 */
+
+  /* USER CODE END TIM16_Init 1 */
+  htim16.Instance = TIM16;
+  htim16.Init.Prescaler = 71;
+  htim16.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim16.Init.Period = 10000-1;
+  htim16.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim16.Init.RepetitionCounter = 0;
+  htim16.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim16) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM16_Init 2 */
+
+  /* USER CODE END TIM16_Init 2 */
+
+}
+
+/**
+  * @brief TIM17 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM17_Init(void)
+{
+
+  /* USER CODE BEGIN TIM17_Init 0 */
+
+  /* USER CODE END TIM17_Init 0 */
+
+  /* USER CODE BEGIN TIM17_Init 1 */
+
+  /* USER CODE END TIM17_Init 1 */
+  htim17.Instance = TIM17;
+  htim17.Init.Prescaler = 71;
+  htim17.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim17.Init.Period = 10000;
+  htim17.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim17.Init.RepetitionCounter = 0;
+  htim17.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim17) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM17_Init 2 */
+
+  /* USER CODE END TIM17_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -413,10 +682,22 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(CS_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : LEFT_BUTTON_Pin DOWN_BUTTON_Pin */
-  GPIO_InitStruct.Pin = LEFT_BUTTON_Pin|DOWN_BUTTON_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  /*Configure GPIO pin : LEFT_BUTTON_Pin */
+  GPIO_InitStruct.Pin = LEFT_BUTTON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(LEFT_BUTTON_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : RIGHT_BUTTON_Pin DOWN_BUTTON_Pin */
+  GPIO_InitStruct.Pin = RIGHT_BUTTON_Pin|DOWN_BUTTON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : MENU_BUTTON_Pin UP_BUTTON_Pin */
+  GPIO_InitStruct.Pin = MENU_BUTTON_Pin|UP_BUTTON_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB5 */
@@ -426,6 +707,13 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
   GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */

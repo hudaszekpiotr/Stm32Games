@@ -31,6 +31,11 @@ extern "C" {
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include <stdint.h>
+#include <stdbool.h>
+#include "menu_screens.h"
+#include "snake.h"
+#include "enums_types.h"
 
 /* USER CODE END Includes */
 
@@ -65,19 +70,35 @@ void Error_Handler(void);
 #define USART_RX_GPIO_Port GPIOA
 #define CS_Pin GPIO_PIN_6
 #define CS_GPIO_Port GPIOA
-#define LEFT_BUTTON_Pin GPIO_PIN_10
-#define LEFT_BUTTON_GPIO_Port GPIOB
+#define LEFT_BUTTON_Pin GPIO_PIN_7
+#define LEFT_BUTTON_GPIO_Port GPIOC
+#define LEFT_BUTTON_EXTI_IRQn EXTI9_5_IRQn
+#define RIGHT_BUTTON_Pin GPIO_PIN_8
+#define RIGHT_BUTTON_GPIO_Port GPIOA
+#define RIGHT_BUTTON_EXTI_IRQn EXTI9_5_IRQn
+#define DOWN_BUTTON_Pin GPIO_PIN_9
+#define DOWN_BUTTON_GPIO_Port GPIOA
+#define DOWN_BUTTON_EXTI_IRQn EXTI9_5_IRQn
 #define TMS_Pin GPIO_PIN_13
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
-#define DOWN_BUTTON_Pin GPIO_PIN_4
-#define DOWN_BUTTON_GPIO_Port GPIOB
+#define MENU_BUTTON_Pin GPIO_PIN_4
+#define MENU_BUTTON_GPIO_Port GPIOB
+#define MENU_BUTTON_EXTI_IRQn EXTI4_IRQn
+#define UP_BUTTON_Pin GPIO_PIN_6
+#define UP_BUTTON_GPIO_Port GPIOB
+#define UP_BUTTON_EXTI_IRQn EXTI9_5_IRQn
 
 /* USER CODE BEGIN Private defines */
-
+#define ADXL345_ADDR 0x1D
+#define REG_BW_RATE 0x2C
+#define REG_POWER_CTL 0x2D
+#define REG_DATA_FORMAT 0x31
+#define DATAX0 0x32
+#define DATAY0 0x34
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus
