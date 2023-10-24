@@ -33,8 +33,11 @@ extern "C" {
 /* USER CODE BEGIN Includes */
 #include <stdint.h>
 #include <stdbool.h>
+#include <time.h>
+#include <stdlib.h>
 #include "menu_screens.h"
 #include "snake.h"
+#include "tetris.h"
 #include "enums_types.h"
 
 /* USER CODE END Includes */
@@ -58,7 +61,7 @@ extern "C" {
 void Error_Handler(void);
 
 /* USER CODE BEGIN EFP */
-
+void set_screen_brightness(unsigned brightness);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
@@ -93,8 +96,7 @@ void Error_Handler(void);
 #define UP_BUTTON_EXTI_IRQn EXTI9_5_IRQn
 
 /* USER CODE BEGIN Private defines */
-#define ADXL345_ADDR 0x1D
-#define REG_BW_RATE 0x2C
+#define ADXL345_ADDR 0x53<<1
 #define REG_POWER_CTL 0x2D
 #define REG_DATA_FORMAT 0x31
 #define DATAX0 0x32

@@ -93,15 +93,14 @@ void set_screens_register(uint8_t addr, uint8_t data){
 
 void setup_screen(){
 	uint8_t REG_DECODE_MODE = 0x0B;
-	uint8_t REG_INTENSITY = 0x0A;
 	uint8_t REG_SCAN_LIMIT = 0x0B;
 	uint8_t REG_SHUTDOWN = 0x0C;
 	uint8_t REG_DISP_TEST  = 0x0F;
 
 	set_screens_register(REG_SHUTDOWN, 0x01);
 	set_screens_register(REG_SCAN_LIMIT, 0x07);
-	set_screens_register(REG_INTENSITY, 0x00);
 	set_screens_register(REG_DECODE_MODE, 0xFF);
+	set_screen_brightness(screen_brightness);
 
 	for(int i = 1; i <= 8; i++){
 		set_screens_register(i, 0x00);
@@ -110,6 +109,13 @@ void setup_screen(){
 	set_screens_register(REG_DISP_TEST, 0x01);
 	HAL_Delay(100);
 	set_screens_register(REG_DISP_TEST, 0x00);
+}
+
+void set_screen_brightness(unsigned brightness){
+	uint8_t REG_INTENSITY = 0x0A;
+	if(brightness < 16){
+		set_screens_register(REG_INTENSITY, brightness-1);
+	}
 }
 
 void draw_frame(uint16_t * array) {
@@ -137,28 +143,47 @@ void draw_frame(uint16_t * array) {
 }
 
 void setup_accelerometr() {
-	uint8_t val_bw_rate = 0b00000000;//100Hz
 	uint8_t val_power_ctl = 0b00001000;//turn on
 	uint8_t val_data_format = 0b00000000;// +-2g
 
+	uint8_t chipid=0;
+	HAL_I2C_Mem_Read(&hi2c1, ADXL345_ADDR, 0x00, 1, &chipid, 1, 100);
+
 	HAL_I2C_Mem_Write(&hi2c1, ADXL345_ADDR, REG_POWER_CTL, 1, &val_power_ctl, sizeof(val_power_ctl), HAL_MAX_DELAY);
 	HAL_I2C_Mem_Write(&hi2c1, ADXL345_ADDR, REG_DATA_FORMAT, 1, &val_data_format, sizeof(val_data_format), HAL_MAX_DELAY);
-	HAL_I2C_Mem_Write(&hi2c1, ADXL345_ADDR, REG_BW_RATE, 1, &val_bw_rate, sizeof(val_bw_rate), HAL_MAX_DELAY);
+}
+
+void adxl_read_values (uint8_t reg, uint8_t* data_rec)
+{
+   HAL_I2C_Mem_Read (&hi2c1, ADXL345_ADDR, reg, 1, (uint8_t *)data_rec, 6, 100);
 }
 
 Vector2D get_accelerometr_input(){
-	int16_t x_val;
-	int16_t y_val;
-	HAL_I2C_Mem_Read(&hi2c1, ADXL345_ADDR, DATAX0 | 0x80, 1, (uint8_t*)&x_val, sizeof(x_val), HAL_MAX_DELAY);
-	HAL_I2C_Mem_Read(&hi2c1, ADXL345_ADDR, DATAY0 | 0x80, 1, (uint8_t*)&y_val, sizeof(y_val), HAL_MAX_DELAY);
+	uint8_t data_rec[6];
+	adxl_read_values(0x32, data_rec);
+	int16_t x,y,z;
+	x = ((data_rec[1]<<8)|data_rec[0]);
+	y = ((data_rec[3]<<8)|data_rec[2]);
+	z = ((data_rec[5]<<8)|data_rec[4]);
+	float xg, yg, zg;
+	xg = x * 0.003914;
+	yg = y * 0.003914;
+	zg = z * 0.003914;
 
-	Vector2D vector = {(float)x_val/0x7FFF, (float)y_val/0x7FFF};
+	Vector2D vector = {-xg, yg};
 	return vector;
 }
 
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+	unsigned timer_val = __HAL_TIM_GET_COUNTER(&htim16);
+	static bool seeded = false;
+	if(!seeded && (GPIO_Pin == UP_BUTTON_Pin || GPIO_Pin == DOWN_BUTTON_Pin || GPIO_Pin == MENU_BUTTON_Pin)){
+		srand(timer_val);
+		seeded = true;
+	}
+
 	switch(GPIO_Pin){
 	case MENU_BUTTON_Pin:
 		menu_button_edge_falling = true;
@@ -207,6 +232,9 @@ void check_buttons(){
 		case SnakeMenu:
 			draw_frame(get_snake_menu_screen());
 			break;
+		case TetrisMenu:
+			draw_frame(get_tetris_menu_screen());
+			break;
 		case Brightness:
 			draw_frame(get_brightness_menu_screen(screen_brightness));
 			break;
@@ -230,9 +258,17 @@ void check_buttons(){
 				player_input_dpad.x = 0;
 				player_input_dpad.y = 0;
 				break;
+			case TetrisMenu:
+				in_menu = false;
+				game_name = Tetris;
+				new_game = true;
+				player_input_dpad.x = 0;
+				player_input_dpad.y = 0;
+				break;
 			case Brightness:
 				if(screen_brightness < 16) screen_brightness++;
 				draw_frame(get_brightness_menu_screen(screen_brightness));
+				set_screen_brightness(screen_brightness);
 				break;
 			case Difficulty:
 				if(difficulty < 16) difficulty++;
@@ -257,9 +293,17 @@ void check_buttons(){
 				player_input_dpad.x = 0;
 				player_input_dpad.y = 0;
 				break;
+			case TetrisMenu:
+				in_menu = false;
+				game_name = Tetris;
+				new_game = true;
+				player_input_dpad.x = 0;
+				player_input_dpad.y = 0;
+				break;
 			case Brightness:
 				if(screen_brightness > 1) screen_brightness--;
 				draw_frame(get_brightness_menu_screen(screen_brightness));
+				set_screen_brightness(screen_brightness);
 				break;
 			case Difficulty:
 				if(difficulty > 1) difficulty--;
@@ -281,9 +325,13 @@ void check_buttons(){
 				menu_screen = Brightness;
 				draw_frame(get_brightness_menu_screen(screen_brightness));
 				break;
-			case ControlMethodMenu:
-				menu_screen = Snake;
+			case TetrisMenu:
+				menu_screen = SnakeMenu;
 				draw_frame(get_snake_menu_screen());
+				break;
+			case ControlMethodMenu:
+				menu_screen = TetrisMenu;
+				draw_frame(get_tetris_menu_screen());
 				break;
 			case Difficulty:
 				menu_screen = ControlMethodMenu;
@@ -302,6 +350,10 @@ void check_buttons(){
 		if(in_menu){
 			switch(menu_screen){
 			case SnakeMenu:
+				menu_screen = TetrisMenu;
+				draw_frame(get_tetris_menu_screen());
+				break;
+			case TetrisMenu:
 				menu_screen = ControlMethodMenu;
 				draw_frame(get_control_method_menu_screen(control_method));
 				break;
@@ -314,7 +366,7 @@ void check_buttons(){
 				draw_frame(get_brightness_menu_screen(screen_brightness));
 				break;
 			case Brightness:
-				menu_screen = Snake;
+				menu_screen = SnakeMenu;
 				draw_frame(get_snake_menu_screen());
 				break;
 			}
@@ -323,23 +375,39 @@ void check_buttons(){
 }
 
 void play_game_timer_it(){
-	Vector2D player_input;
-	if(control_method == Dpad){
-		player_input = player_input_dpad;
-	}else{
-		player_input = get_accelerometr_input();
-	}
+	static int counter = 0;
+	if(!in_menu){
+		int divider = 2*(16 - difficulty);
+			if(counter < divider){
+				counter++;
+			}else{
+				counter = 0;
+				Vector2D player_input;
+				Vector2D player_input_accelerometer = get_accelerometr_input();
+				if(control_method == Dpad){
+					player_input = player_input_dpad;
+				}else{
+					player_input = player_input_accelerometer;
+				}
 
-	uint16_t* frame;
-	switch(game_name){
-	case Snake:
-		frame = snake_get_frame(player_input, control_method, new_game);
-		new_game = false;
-		break;
-	case Tetris:
-		break;
+				uint16_t* frame;
+				switch(game_name){
+				case Snake:
+					frame = snake_get_frame(player_input, control_method, new_game);
+					new_game = false;
+					player_input_dpad.x = 0;
+					player_input_dpad.y = 0;
+					break;
+				case Tetris:
+					frame = tetris_get_frame(player_input_dpad, player_input_accelerometer, control_method, new_game);
+					new_game = false;
+					player_input_dpad.x = 0;
+					player_input_dpad.y = 0;
+					break;
+				}
+				draw_frame(frame);
+			}
 	}
-	draw_frame(frame);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)

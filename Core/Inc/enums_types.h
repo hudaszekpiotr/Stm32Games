@@ -14,8 +14,8 @@ typedef struct Vector2D {
 } Vector2D;
 
 typedef struct ScreenPosition {
-	unsigned x;
-	unsigned y;
+	uint8_t x;
+	uint8_t y;
 } ScreenPosition;
 
 typedef enum  {
@@ -30,6 +30,7 @@ typedef enum  {
 
 typedef enum  {
 	SnakeMenu,
+	TetrisMenu,
 	ControlMethodMenu,
 	Difficulty,
 	Brightness

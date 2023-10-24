@@ -6,6 +6,7 @@
 #include "enums_types.h"
 #include <math.h>
 
+uint16_t* get_game_over_screen();
 
 uint16_t* get_snake_menu_screen();
 
