@@ -20,7 +20,8 @@ typedef struct ScreenPosition {
 
 typedef enum  {
 	Snake,
-	Tetris
+	Tetris,
+	Space
 } GameName;
 
 typedef enum  {
@@ -31,6 +32,7 @@ typedef enum  {
 typedef enum  {
 	SnakeMenu,
 	TetrisMenu,
+	SpaceMenu,
 	ControlMethodMenu,
 	Difficulty,
 	Brightness

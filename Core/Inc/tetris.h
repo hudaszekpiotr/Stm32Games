@@ -12,9 +12,6 @@
 #define LOST_GAME_FRAMES_TETRIS 30
 #define TILT_THRESHOLD_TETRIS 0.2
 
-
-#include "tetris.h"
-
 typedef struct Block {
 	int row;
 	int rotation_center;
@@ -44,7 +41,7 @@ bool move_block_right(uint16_t* frame, Block* block);
 
 bool move_block_left(uint16_t* frame, Block* block);
 
-void clear_bottom(uint16_t* frame);
+bool clear_bottom(uint16_t* frame);
 
 uint16_t* tetris_get_frame(Vector2D player_input, Vector2D player_input_accelerometer, ControlMethod control_method, bool new_game);
 

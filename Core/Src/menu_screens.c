@@ -61,6 +61,26 @@ uint16_t* get_tetris_menu_screen(){
 	return tetris_menu_screen;
 }
 
+uint16_t* get_space_menu_screen(){
+	static uint16_t space_menu_screen[16] = {	0b0000000000000000,
+												0b0111101111001100,
+												0b0100001001010010,
+												0b0111101111011110,
+												0b0000101000010010,
+												0b0111101000010010,
+												0b0000000000000000,
+												0b0000111001111000,
+												0b0001000001000000,
+												0b0001000001111000,
+												0b0001000001000000,
+												0b0000111001111000,
+												0b0000000000000000,
+												0b0111111111111110,
+												0b0101010110101010,
+												0b0000000000000000};
+	return space_menu_screen;
+}
+
 uint16_t* get_difficulty_menu_screen(int difficulty){
 	static uint16_t difficulty_menu_screen[16]={0b0000000000000000,
 												0b0100001111010010,

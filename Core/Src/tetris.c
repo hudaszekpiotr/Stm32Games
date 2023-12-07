@@ -82,18 +82,24 @@ void rotate_block(uint16_t* frame, Block* block) {
 			new_block->shape[0] = 0;
 		}
 
-		if(rot_center == 16){
+		if(rot_center == 12){
 			new_block->shape[0] = 0;
 			new_block->shape[1] = 0;
-			new_block->shape[2] = 0b1111<<12;
+			new_block->shape[2] = 0b1111<<9;
 			new_block->shape[3] = 0;
-			new_block->rotation_center = 14;
-		}else if(rot_center == 0){
+			new_block->rotation_center = 10;
+		}else if(rot_center == 3){
 			new_block->shape[0] = 0;
-			new_block->shape[1] = 0b1111<<0;
+			new_block->shape[1] = 0b1111<<3;
 			new_block->shape[2] = 0;
 			new_block->shape[3] = 0;
-			new_block->rotation_center = 2;
+			new_block->rotation_center = 5;
+		}else if(rot_center == 13){
+			new_block->shape[0] = 0;
+			new_block->shape[1] = 0;
+			new_block->shape[2] = 0b1111<<9;
+			new_block->shape[3] = 0;
+			new_block->rotation_center = 10;
 		}else if(get_bit(new_block->shape[1], rot_center) && get_bit(new_block->shape[1], rot_center-1)){
 			unsigned val = 0b0010<<(rot_center-2);									//0000
 			new_block->shape[0] = val;												//1111
@@ -101,8 +107,11 @@ void rotate_block(uint16_t* frame, Block* block) {
 			new_block->shape[2] = val;												//0000
 			new_block->shape[3] = val;
 		}else if(get_bit(new_block->shape[1], rot_center-1) && get_bit(new_block->shape[2], rot_center-1)){
-			if(rot_center == 1){													//0010
-				new_block->rotation_center = 2;										//0010
+			if(rot_center == 4){													//0010
+				new_block->rotation_center = 5;										//0010
+			}																		//0010
+			if(rot_center == 12){
+				new_block->rotation_center = 11;
 			}
 			new_block->shape[0] = 0;
 			new_block->shape[1] = 0;
@@ -116,27 +125,31 @@ void rotate_block(uint16_t* frame, Block* block) {
 			new_block->shape[2] = val;
 			new_block->shape[3] = val;
 		}else{																	//0100
-			if(rot_center == 15){							//0100
-				new_block->rotation_center = 14;								//0100
+			if(rot_center == 12){												//0100
+				new_block->rotation_center = 11;								//0100
 			}																	//0100
+
+			if(rot_center == 4){
+				new_block->rotation_center = 5;
+			}
 			new_block->shape[0] = 0;
 			new_block->shape[1] = 0b1111<<(new_block->rotation_center-2);
 			new_block->shape[2] = 0;
 			new_block->shape[3] = 0;
 		}
 	}else if(block->type != 'O'){
-		if(new_block->rotation_center == 0){
+		if(new_block->rotation_center == 3){
 			for (int i = 0; i < 4; i++) {
 				new_block->shape[i] = block->shape[i] << 1;
 			}
 			did_wall_kick = true;
-			new_block->rotation_center = 1;
-		}else if(new_block->rotation_center == 15){
+			new_block->rotation_center = 4;
+		}else if(new_block->rotation_center == 12){
 			for (int i = 0; i < 4; i++) {
 				new_block->shape[i] = block->shape[i] >> 1;
 			}
 			did_wall_kick = true;
-			new_block->rotation_center = 14;
+			new_block->rotation_center = 11;
 		}
 		rotate(new_block->shape, new_block->rotation_center, 1);
 	}
@@ -288,22 +301,26 @@ bool move_block_left(uint16_t* frame, Block* block) {
 	return false;
 }
 
-void clear_bottom(uint16_t* frame) {
+bool clear_bottom(uint16_t* frame) {
+	bool cleared = false;
 	for (int i = 15; i >= 0; i--) {
 		if (frame[i] == 0b1111111111111111) {
+			cleared = true;
 			for (int j = i - 1; j >= 0; j--) {
 				frame[j + 1] = frame[j];
 			}
-			frame[0] = 0;
+			frame[0] = 57351;
 			i++;
 		}
 	}
+	return cleared;
 }
 
 
 
 uint16_t* tetris_get_frame(Vector2D player_input_dpad, Vector2D player_input_accelerometer, ControlMethod control_method, bool new_game) {
-	static uint16_t frame[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	static uint16_t frame[16] = { 57351,57351,57351,57351,57351,57351,57351,57351,
+								57351,57351,57351,57351,57351,57351,57351,57351 }; //0b1110000000000111
 	static Block block;
 	static int frame_counter = 0;
 
@@ -331,14 +348,12 @@ uint16_t* tetris_get_frame(Vector2D player_input_dpad, Vector2D player_input_acc
 
 	if (new_game) {
 		for (int i = 0; i < 16; i++) {
-			frame[i] = 0;
+			frame[i] = 57351;
 		}
 		spawn_new_block(frame, &block);
 		lost_game = false;
 		return frame;
 	}
-
-
 
 
 	if (player_input.x > TILT_THRESHOLD_TETRIS) {
@@ -351,11 +366,17 @@ uint16_t* tetris_get_frame(Vector2D player_input_dpad, Vector2D player_input_acc
 		rotate_block(frame, &block);
 	}
 	else if (player_input.y < -TILT_THRESHOLD_TETRIS) {
+		frame_counter = 0;
 		if (!move_block_down(frame, &block)) {
 			if(!spawn_new_block(frame, &block)){
 				lost_game = true;
 			}
-			clear_bottom(frame);
+			return frame;
+		}
+		if(clear_bottom(frame)){
+			if(!spawn_new_block(frame, &block)){
+				lost_game = true;
+			}
 			return frame;
 		}
 	}
@@ -366,9 +387,15 @@ uint16_t* tetris_get_frame(Vector2D player_input_dpad, Vector2D player_input_acc
 				lost_game = true;
 			}
 		}
+		if(clear_bottom(frame)){
+			if(!spawn_new_block(frame, &block)){
+				lost_game = true;
+			}
+			return frame;
+		}
 	}
 	frame_counter++;
 
-	clear_bottom(frame);
+
 	return frame;
 }

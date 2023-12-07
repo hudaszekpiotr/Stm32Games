@@ -27,6 +27,19 @@ uint8_t deque(Queue* queue){
 	return item;
 }
 
+uint8_t get_rear(Queue* queue){
+	uint8_t item = queue->array[queue->rear];
+	return item;
+}
+
+uint8_t get_one_before_rear(Queue* queue){
+	if(queue->rear == 0){
+		return queue->array[(queue->capacity)-1];
+	}
+	uint8_t item = queue->array[(queue->rear)-1];
+	return item;
+}
+
 bool check_if_in_queue(Queue* queue, int elem) {
 	for (int i = 0; i < queue->size; i++) {
 		if (elem == queue->array[(queue->front + i)% queue->capacity]) {
@@ -81,9 +94,9 @@ uint8_t get_new_apple_placement(Queue* queue){
 
 
 bool check_if_move_ok(uint16_t* frame, Queue* queue, int requested_pos) {
-	if (requested_pos == queue->array[(queue->rear)-1]) {
-		int last_pos = queue->array[queue->rear];
-		requested_pos = last_pos + (last_pos - queue->array[queue->rear-1]);
+	if (requested_pos == get_one_before_rear(queue)) {
+		int last_pos = get_rear(queue);
+		requested_pos = last_pos + (last_pos - get_one_before_rear(queue));
 		enqueue(queue, requested_pos);
 		fill_space(frame, requested_pos);
 		return true;
@@ -92,7 +105,7 @@ bool check_if_move_ok(uint16_t* frame, Queue* queue, int requested_pos) {
 		return false;
 	}
 
-	int last_elem = queue->array[queue->rear];
+	int last_elem = get_rear(queue);
 	if (abs(get_row(last_elem)-get_row(requested_pos)) > 1) {
 		return false;
 	}
@@ -151,7 +164,7 @@ uint16_t* snake_get_frame(Vector2D player_input, ControlMethod control_method, b
 		return frame;
 	}
 
-	int last_pos = queue->array[queue->rear];
+	int last_pos = get_rear(queue);
 	int requested_position = 0;
 	if(control_method == Dpad){
 		if(player_input.x > 0){
@@ -163,7 +176,7 @@ uint16_t* snake_get_frame(Vector2D player_input, ControlMethod control_method, b
 		}else if(player_input.y < 0){
 			requested_position = last_pos + 16;
 		}else{
-			requested_position = last_pos + (last_pos - queue->array[queue->rear-1]);
+			requested_position = last_pos + (last_pos - get_one_before_rear(queue));
 		}
 	}else{
 		if(player_input.x > TILT_THRESHOLD && player_input.y > TILT_THRESHOLD){
@@ -183,7 +196,7 @@ uint16_t* snake_get_frame(Vector2D player_input, ControlMethod control_method, b
 		}else if(player_input.y < -TILT_THRESHOLD){
 			requested_position = last_pos + 16;
 		}else{
-			requested_position = last_pos + (last_pos - queue->array[queue->rear-1]);
+			requested_position = last_pos + (last_pos - get_one_before_rear(queue));
 		}
 	}
 	if (!check_if_move_ok(frame, queue, requested_position)) {

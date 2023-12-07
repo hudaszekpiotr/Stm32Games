@@ -38,6 +38,7 @@ extern "C" {
 #include "menu_screens.h"
 #include "snake.h"
 #include "tetris.h"
+#include "space.h"
 #include "enums_types.h"
 
 /* USER CODE END Includes */

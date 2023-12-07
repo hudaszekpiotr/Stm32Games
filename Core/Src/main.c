@@ -106,9 +106,9 @@ void setup_screen(){
 		set_screens_register(i, 0x00);
 	}
 
-	set_screens_register(REG_DISP_TEST, 0x01);
-	HAL_Delay(100);
-	set_screens_register(REG_DISP_TEST, 0x00);
+	//set_screens_register(REG_DISP_TEST, 0x01);
+	//HAL_Delay(100);
+	//set_screens_register(REG_DISP_TEST, 0x00);
 }
 
 void set_screen_brightness(unsigned brightness){
@@ -235,6 +235,9 @@ void check_buttons(){
 		case TetrisMenu:
 			draw_frame(get_tetris_menu_screen());
 			break;
+		case SpaceMenu:
+			draw_frame(get_space_menu_screen());
+			break;
 		case Brightness:
 			draw_frame(get_brightness_menu_screen(screen_brightness));
 			break;
@@ -261,6 +264,13 @@ void check_buttons(){
 			case TetrisMenu:
 				in_menu = false;
 				game_name = Tetris;
+				new_game = true;
+				player_input_dpad.x = 0;
+				player_input_dpad.y = 0;
+				break;
+			case SpaceMenu:
+				in_menu = false;
+				game_name = Space;
 				new_game = true;
 				player_input_dpad.x = 0;
 				player_input_dpad.y = 0;
@@ -300,6 +310,13 @@ void check_buttons(){
 				player_input_dpad.x = 0;
 				player_input_dpad.y = 0;
 				break;
+			case SpaceMenu:
+				in_menu = false;
+				game_name = Space;
+				new_game = true;
+				player_input_dpad.x = 0;
+				player_input_dpad.y = 0;
+				break;
 			case Brightness:
 				if(screen_brightness > 1) screen_brightness--;
 				draw_frame(get_brightness_menu_screen(screen_brightness));
@@ -329,9 +346,13 @@ void check_buttons(){
 				menu_screen = SnakeMenu;
 				draw_frame(get_snake_menu_screen());
 				break;
-			case ControlMethodMenu:
+			case SpaceMenu:
 				menu_screen = TetrisMenu;
 				draw_frame(get_tetris_menu_screen());
+				break;
+			case ControlMethodMenu:
+				menu_screen = SpaceMenu;
+				draw_frame(get_space_menu_screen());
 				break;
 			case Difficulty:
 				menu_screen = ControlMethodMenu;
@@ -354,6 +375,10 @@ void check_buttons(){
 				draw_frame(get_tetris_menu_screen());
 				break;
 			case TetrisMenu:
+				menu_screen = SpaceMenu;
+				draw_frame(get_space_menu_screen(control_method));
+				break;
+			case SpaceMenu:
 				menu_screen = ControlMethodMenu;
 				draw_frame(get_control_method_menu_screen(control_method));
 				break;
@@ -394,17 +419,17 @@ void play_game_timer_it(){
 				switch(game_name){
 				case Snake:
 					frame = snake_get_frame(player_input, control_method, new_game);
-					new_game = false;
-					player_input_dpad.x = 0;
-					player_input_dpad.y = 0;
 					break;
 				case Tetris:
 					frame = tetris_get_frame(player_input_dpad, player_input_accelerometer, control_method, new_game);
-					new_game = false;
-					player_input_dpad.x = 0;
-					player_input_dpad.y = 0;
+					break;
+				case Space:
+					frame = space_get_frame(player_input, control_method, new_game);
 					break;
 				}
+				new_game = false;
+				player_input_dpad.x = 0;
+				player_input_dpad.y = 0;
 				draw_frame(frame);
 			}
 	}
